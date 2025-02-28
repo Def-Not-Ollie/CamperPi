@@ -1,58 +1,49 @@
 #!/bin/bash
 
-set -e  # Stop script on error
+set -e  # Stop script on any error
+set -x  # Show all executed commands (for debugging)
 
-# Variables
-USER="admin"
-HA_DIR="/home/$USER/homeassistant"
-VENV_DIR="$HA_DIR/venv"
-PYTHON_VERSION="3.11"
+echo "Updating system time to prevent repository errors..."
+sudo date -s "$(curl -s --head http://google.com | grep '^Date:' | cut -d' ' -f3-6)Z"
 
-# Update and install dependencies
-echo "Updating system and installing dependencies..."
-sudo apt update && sudo apt upgrade -y
-sudo apt install -y python3 python3-pip python3-venv python3-dev libffi-dev libssl-dev libjpeg-dev zlib1g-dev autoconf build-essential \
-    libopenjp2-7-dev libtiff5 libturbojpeg0-dev tzdata ffmpeg
+echo "Updating package lists..."
+sudo apt update || sudo apt-get update
 
-# Create user and set permissions
-if ! id "$USER" &>/dev/null; then
-    echo "Creating user $USER..."
-    sudo useradd -rm "$USER" -G dialout,gpio,i2c
-fi
+echo "Upgrading system packages..."
+sudo apt upgrade -y
 
-# Create and set up Home Assistant directory
-echo "Setting up Home Assistant environment..."
-sudo -u $USER mkdir -p $HA_DIR
-cd $HA_DIR
+echo "Installing required dependencies..."
+sudo apt install -y \
+    python3 python3-pip python3-venv \
+    git wget curl \
+    avahi-daemon \
+    libtiff6  # Replaced libtiff5 with libtiff6 (correct for Debian Bookworm)
 
-# Create and activate virtual environment
-sudo -u $USER python3 -m venv $VENV_DIR
-source $VENV_DIR/bin/activate
-
-# Upgrade pip and install Home Assistant
-echo "Installing Home Assistant..."
-pip install --upgrade pip wheel
+echo "Setting up Home Assistant..."
+python3 -m venv homeassistant
+source homeassistant/bin/activate
+pip install --upgrade pip
 pip install homeassistant
 
-# Create systemd service file
 echo "Creating Home Assistant service..."
-SERVICE_FILE="/etc/systemd/system/home-assistant.service"
-echo "[Unit]
+cat <<EOF | sudo tee /etc/systemd/system/home-assistant.service
+[Unit]
 Description=Home Assistant
 After=network.target
 
 [Service]
 Type=simple
-User=$USER
-ExecStart=$VENV_DIR/bin/hass -c $HA_DIR
-Restart=always
+User=admin
+ExecStart=/home/admin/homeassistant/bin/hass
+Restart=on-failure
 
 [Install]
-WantedBy=multi-user.target" | sudo tee $SERVICE_FILE
+WantedBy=multi-user.target
+EOF
 
-# Reload systemd and enable service
-sudo systemctl daemon-reload
+echo "Enabling Home Assistant to start on boot..."
 sudo systemctl enable home-assistant
 sudo systemctl start home-assistant
 
-echo "Installation complete! Home Assistant is now running."
+echo "Installation complete. Rebooting..."
+sudo reboot
