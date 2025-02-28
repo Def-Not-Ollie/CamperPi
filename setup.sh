@@ -12,13 +12,17 @@ echo "📌 Installing dependencies..."
 sudo apt install -y \
     python3 python3-venv python3-pip \
     libffi-dev libssl-dev libjpeg-dev zlib1g-dev \
-    autoconf build-essential libopenjp2-7 libtiff5 \
-    libturbojpeg0-dev tzdata kodi
+    autoconf build-essential libopenjp2-7 libturbojpeg0-dev \
+    tzdata kodi
+
+# libtiff5 is outdated; replaced with libtiff-dev (a compatible package for newer systems)
+sudo apt install -y libtiff-dev
 
 echo "📌 Setting up Home Assistant..."
 sudo mkdir -p "$HASS_DIR"
 sudo chown admin:admin "$HASS_DIR"
 
+# Set up Python virtual environment
 python3 -m venv "$VENV_DIR"
 source "$VENV_DIR/bin/activate"
 
