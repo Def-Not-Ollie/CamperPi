@@ -1,32 +1,34 @@
 #!/bin/bash
+set -e  # Exit immediately if a command exits with a non-zero status
 
-set -e  # Stop script on any error
-set -x  # Show all executed commands (for debugging)
+# Define installation directories
+HASS_DIR="/home/admin/homeassistant"
+VENV_DIR="$HASS_DIR/venv"
 
-echo "Updating system time to prevent repository errors..."
-sudo date -s "$(curl -s --head http://google.com | grep '^Date:' | cut -d' ' -f3-6)Z"
+echo "📌 Updating system..."
+sudo apt update && sudo apt upgrade -y
 
-echo "Updating package lists..."
-sudo apt update || sudo apt-get update
-
-echo "Upgrading system packages..."
-sudo apt upgrade -y
-
-echo "Installing required dependencies..."
+echo "📌 Installing dependencies..."
 sudo apt install -y \
-    python3 python3-pip python3-venv \
-    git wget curl \
-    avahi-daemon \
-    libtiff6  # Replaced libtiff5 with libtiff6 (correct for Debian Bookworm)
+    python3 python3-venv python3-pip \
+    libffi-dev libssl-dev libjpeg-dev zlib1g-dev \
+    autoconf build-essential libopenjp2-7 libtiff5 \
+    libturbojpeg0-dev tzdata kodi
 
-echo "Setting up Home Assistant..."
-python3 -m venv homeassistant
-source homeassistant/bin/activate
-pip install --upgrade pip
-pip install homeassistant
+echo "📌 Setting up Home Assistant..."
+sudo mkdir -p "$HASS_DIR"
+sudo chown admin:admin "$HASS_DIR"
 
-echo "Creating Home Assistant service..."
-cat <<EOF | sudo tee /etc/systemd/system/home-assistant.service
+python3 -m venv "$VENV_DIR"
+source "$VENV_DIR/bin/activate"
+
+echo "📌 Upgrading pip and installing Home Assistant..."
+pip install --upgrade pip setuptools wheel
+pip install homeassistant==2024.2.0
+pip install acme==2.8.0 cryptography==42.0.5 pyOpenSSL==24.0.0 josepy==1.15.0
+
+echo "📌 Creating Home Assistant service..."
+sudo tee /etc/systemd/system/home-assistant.service > /dev/null <<EOL
 [Unit]
 Description=Home Assistant
 After=network.target
@@ -34,16 +36,20 @@ After=network.target
 [Service]
 Type=simple
 User=admin
-ExecStart=/home/admin/homeassistant/bin/hass
-Restart=on-failure
+ExecStart=$VENV_DIR/bin/hass --config $HASS_DIR
+Restart=always
 
 [Install]
 WantedBy=multi-user.target
-EOF
+EOL
 
-echo "Enabling Home Assistant to start on boot..."
+echo "📌 Enabling and starting Home Assistant..."
+sudo systemctl daemon-reload
 sudo systemctl enable home-assistant
 sudo systemctl start home-assistant
 
-echo "Installation complete. Rebooting..."
-sudo reboot
+echo "📌 Enabling Kodi to start at boot..."
+sudo systemctl enable kodi
+
+echo "✅ Setup complete! Access Home Assistant at: http://your-raspberry-pi-ip:8123"
+echo "🎬 Kodi can be started manually with: kodi"
