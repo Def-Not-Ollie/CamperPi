@@ -27,7 +27,7 @@ echo "Setting up Home Assistant in Docker..."
 
 mkdir -p "$HA_CONFIG_DIR"
 
-# Check if homeassistant container already exists to avoid error
+# Check if homeassistant container exists
 if sudo docker ps -a --format '{{.Names}}' | grep -q '^homeassistant$'; then
     echo "Home Assistant container already exists. Starting it..."
     sudo docker start homeassistant
@@ -67,7 +67,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable home-assistant
 sudo systemctl start home-assistant
 
-# 6. Set Up Kodi to Start on Boot
+# 6. Set Up Kodi to Start on Boot (enable only, no immediate start)
 echo "Setting up Kodi systemd service..."
 
 sudo tee /etc/systemd/system/kodi.service > /dev/null <<EOF
@@ -89,7 +89,7 @@ EOF
 
 sudo systemctl daemon-reload
 sudo systemctl enable kodi
-sudo systemctl start kodi
+# Note: Kodi service NOT started now; will start automatically on reboot
 
 # 7. Reboot & Verify
 echo "Setup complete. Rebooting system now..."
