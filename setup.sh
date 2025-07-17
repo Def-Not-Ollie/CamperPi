@@ -1,62 +1,48 @@
 #!/bin/bash
 set -e
 
-# Variables
-USER="admin"
+# Auto-detect current user
+USER=$(whoami)
 HOME_DIR="/home/$USER"
 HA_CONFIG_DIR="$HOME_DIR/homeassistant"
 
-# 1. Sync Time
+echo "Starting CamperPi setup as $USER..."
+
+# Sync time
 echo "Syncing time..."
 sudo timedatectl set-ntp on
 sudo systemctl restart systemd-timesyncd
 
-# 2. Update & Install Required Packages
-echo "Updating system and installing packages..."
-sudo apt update
-sudo apt upgrade -y
-sudo apt install -y kodi docker.io docker-compose
+# Update & install required packages
+echo "Updating system and installing dependencies..."
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y kodi docker.io docker-compose hostapd dnsmasq iptables-persistent netfilter-persistent
 
-# 3. Set Up Kodi to Start on Boot
-echo "Setting up Kodi systemd service..."
+# Enable Docker
+echo "Enabling Docker..."
+sudo systemctl enable docker
+sudo systemctl start docker
 
-sudo tee /etc/systemd/system/kodi.service > /dev/null <<EOF
-[Unit]
-Description=Kodi Media Center
-After=network.target
-
-[Service]
-User=$USER
-Group=$USER
-Type=simple
-ExecStart=/usr/bin/kodi --standalone
-Restart=unless-stopped
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl daemon-reload
-sudo systemctl enable kodi
-sudo systemctl start kodi
-
-# 4. Install & Set Up Home Assistant in Docker
+# Home Assistant container setup
 echo "Setting up Home Assistant in Docker..."
-
 mkdir -p "$HA_CONFIG_DIR"
 
-sudo docker run -d \
-  --name homeassistant \
-  --restart=unless-stopped \
-  --privileged \
-  -v "$HA_CONFIG_DIR:/config" \
-  --network=host \
-  ghcr.io/home-assistant/home-assistant:stable
+if sudo docker ps -a --format '{{.Names}}' | grep -q '^homeassistant$'; then
+    echo "Home Assistant container already exists. Starting it..."
+    sudo docker start homeassistant
+else
+    echo "Creating and starting Home Assistant container..."
+    sudo docker run -d \
+      --name homeassistant \
+      --restart=unless-stopped \
+      --privileged \
+      -v "$HA_CONFIG_DIR:/config" \
+      --network=host \
+      ghcr.io/home-assistant/home-assistant:stable
+fi
 
-# 5. Set Up Home Assistant to Start on Boot
-echo "Setting up Home Assistant systemd service..."
-
+# Home Assistant systemd service
+echo "Creating Home Assistant service..."
 sudo tee /etc/systemd/system/home-assistant.service > /dev/null <<EOF
 [Unit]
 Description=Home Assistant
@@ -79,11 +65,82 @@ sudo systemctl daemon-reload
 sudo systemctl enable home-assistant
 sudo systemctl start home-assistant
 
-# 6. Enable Docker to Start on Boot
-echo "Enabling Docker to start on boot..."
-sudo systemctl enable docker
-sudo systemctl start docker
+# Kodi systemd service (enable only, delay until reboot)
+echo "Creating Kodi service..."
+sudo tee /etc/systemd/system/kodi.service > /dev/null <<EOF
+[Unit]
+Description=Kodi Media Center
+After=network.target
 
-# 7. Reboot & Verify
-echo "Setup complete. Rebooting system now..."
+[Service]
+User=$USER
+Group=$USER
+Type=simple
+ExecStart=/usr/bin/kodi --standalone
+Restart=unless-stopped
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable kodi
+
+# Setup Wi-Fi Access Point
+echo "Setting up Wi-Fi Access Point on wlan0..."
+sudo tee /etc/hostapd/hostapd.conf > /dev/null <<EOF
+interface=wlan0
+driver=nl80211
+ssid=CamperPi
+hw_mode=g
+channel=7
+wmm_enabled=0
+macaddr_acl=0
+auth_algs=1
+ignore_broadcast_ssid=0
+wpa=2
+wpa_passphrase=CamperPi
+wpa_key_mgmt=WPA-PSK
+rsn_pairwise=CCMP
+EOF
+
+sudo sed -i 's|#DAEMON_CONF=.*|DAEMON_CONF="/etc/hostapd/hostapd.conf"|' /etc/default/hostapd
+echo 'DAEMON_CONF="/etc/hostapd/hostapd.conf"' | sudo tee -a /etc/default/hostapd
+
+# Set static IP for wlan0
+echo "Configuring static IP for wlan0..."
+echo -e "\ninterface wlan0\n    static ip_address=192.168.4.1/24\n    nohook wpa_supplicant" | sudo tee -a /etc/dhcpcd.conf
+
+# Configure dnsmasq
+echo "Configuring dnsmasq..."
+sudo mv /etc/dnsmasq.conf /etc/dnsmasq.conf.orig || true
+sudo tee /etc/dnsmasq.conf > /dev/null <<EOF
+interface=wlan0
+dhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h
+EOF
+
+# Enable hostapd and dnsmasq
+sudo systemctl unmask hostapd
+sudo systemctl enable hostapd
+sudo systemctl enable dnsmasq
+
+# Setup basic NAT for Ethernet and wlan0
+echo "Setting up NAT between eth0 and wlan0..."
+sudo iptables -t nat -A POSTROUTING -o wlan0 -j MASQUERADE
+sudo netfilter-persistent save
+
+# Final message and wait for confirmation before reboot
+echo ""
+echo "======================================"
+echo "  Setup complete!                      "
+echo "  Wi-Fi Access Point details:         "
+echo "    SSID: CamperPi                    "
+echo "    Password: CamperPi                 "
+echo "  Kodi will start on next reboot.     "
+echo "  Home Assistant is running now.      "
+echo "======================================"
+echo ""
+read -p "Press ENTER to reboot now or CTRL+C to cancel..."
+
 sudo reboot
