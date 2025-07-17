@@ -13,6 +13,11 @@ echo "Syncing time..."
 sudo timedatectl set-ntp on
 sudo systemctl restart systemd-timesyncd
 
+# Pre-seed iptables-persistent to avoid prompt
+echo "Preconfiguring iptables-persistent package to auto-save rules..."
+echo iptables-persistent iptables-persistent/autosave_v4 boolean true | sudo debconf-set-selections
+echo iptables-persistent iptables-persistent/autosave_v6 boolean true | sudo debconf-set-selections
+
 # Update & install required packages
 echo "Updating system and installing dependencies..."
 sudo apt update && sudo apt upgrade -y
