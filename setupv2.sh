@@ -20,18 +20,8 @@ echo iptables-persistent iptables-persistent/autosave_v6 boolean true | sudo deb
 
 # Update & install required packages
 echo "Updating system and installing dependencies..."
-sudo apt update && sudo apt upgrade -y
+sudo apt update && sudo apt full-upgrade -y
 sudo apt install -y kodi docker.io docker-compose hostapd dnsmasq iptables-persistent netfilter-persistent
-
-# Stop potential blockers for wlan0
-echo "Stopping wpa_supplicant and NetworkManager to free wlan0..."
-sudo systemctl stop wpa_supplicant
-sudo systemctl stop NetworkManager
-
-# Reset wlan0 interface
-echo "Resetting wlan0 interface..."
-sudo ip link set wlan0 down
-sudo ip link set wlan0 up
 
 # Enable Docker
 echo "Enabling Docker..."
@@ -151,14 +141,4 @@ echo ""
 echo "======================================"
 echo "  Setup complete!                      "
 echo "  Wi-Fi Access Point details:         "
-echo "    SSID: CamperPi                    "
-echo "    Password: CamperPi                 "
-echo "  Kodi will start on next reboot.     "
-echo "  Home Assistant is running now.      "
-echo "  Access Home Assistant at:           "
-echo "    http://192.168.50.1:8123"
-echo "======================================"
-echo ""
-read -p "Press ENTER to reboot now or CTRL+C to cancel..."
-
-sudo reboot
+echo "    SSID:
