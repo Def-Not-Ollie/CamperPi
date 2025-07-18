@@ -127,17 +127,4 @@ echo "Setting up NAT (eth0 → wlan0)..."
 sudo iptables -t nat -A POSTROUTING -o wlan0 -j MASQUERADE
 sudo netfilter-persistent save
 
-echo ""
-echo "======================================"
-echo "  Setup complete!                     "
-echo "  Wi-Fi Access Point:                 "
-echo "    SSID: CamperPi                    "
-echo "    Password: CamperPi                "
-echo "  Kodi will start after reboot.      "
-echo "  Home Assistant started now.        "
-echo "  Access HA at:                      "
-echo "    http://192.168.50.1:8123         "
-echo "======================================"
-echo ""
-
 sudo reboot
