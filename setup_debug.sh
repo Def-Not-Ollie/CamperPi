@@ -111,6 +111,11 @@ interface=wlan0
 dhcp-range=192.168.50.2,192.168.50.20,255.255.255.0,24h
 EOF
 
+echo "Stopping wpa_supplicant and resetting wlan0 for AP mode..."
+sudo systemctl stop wpa_supplicant
+sudo ip link set wlan0 down
+sudo ip link set wlan0 up
+
 sudo systemctl unmask hostapd
 sudo systemctl enable hostapd
 sudo systemctl enable dnsmasq
