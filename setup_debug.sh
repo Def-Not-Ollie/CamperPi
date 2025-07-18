@@ -6,6 +6,9 @@ HA_CONFIG_DIR="/home/$USER/homeassistant"
 
 echo "Starting CamperPi setup as $USER..."
 
+echo "Setting Wi-Fi country to AU..."
+sudo raspi-config nonint do_wifi_country AU
+
 echo "Unblocking Wi-Fi..."
 sudo rfkill unblock wifi
 
