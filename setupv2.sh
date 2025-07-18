@@ -8,6 +8,10 @@ HA_CONFIG_DIR="$HOME_DIR/homeassistant"
 
 echo "Starting CamperPi setup as $USER..."
 
+# Unblock Wi-Fi (fix rfkill issue)
+echo "Unblocking Wi-Fi..."
+sudo rfkill unblock wifi
+
 # Sync time
 echo "Syncing time..."
 sudo timedatectl set-ntp on
@@ -92,11 +96,6 @@ EOF
 sudo systemctl daemon-reload
 sudo systemctl enable kodi
 
-# Stop conflicting services before Wi-Fi AP setup
-echo "Stopping wpa_supplicant and NetworkManager to free wlan0..."
-sudo systemctl stop wpa_supplicant
-sudo systemctl stop NetworkManager
-
 # Setup Wi-Fi Access Point
 echo "Setting up Wi-Fi Access Point on wlan0..."
 sudo tee /etc/hostapd/hostapd.conf > /dev/null <<EOF
@@ -147,7 +146,7 @@ echo "======================================"
 echo "  Setup complete!                      "
 echo "  Wi-Fi Access Point details:         "
 echo "    SSID: CamperPi                    "
-echo "    Password: CamperPi                 "
+echo "    Password: CamperPi                "
 echo "  Kodi will start on next reboot.     "
 echo "  Home Assistant is running now.      "
 echo "  Access Home Assistant at:           "
