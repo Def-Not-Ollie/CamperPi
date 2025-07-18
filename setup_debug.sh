@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euxo pipefail
 
 USER=$(whoami)
 HA_CONFIG_DIR="/home/$USER/homeassistant"
@@ -117,8 +117,7 @@ sudo systemctl restart dnsmasq
 sudo systemctl is-active hostapd && echo "hostapd is running" || echo "hostapd NOT running"
 sudo systemctl is-active dnsmasq && echo "dnsmasq is running" || echo "dnsmasq NOT running"
 
-ip addr show wlan0 | grep 'inet '
-
+ip addr show wlan0 | grep 'inet ' || echo "No IP on wlan0"
 rfkill list wlan
 
 echo "Setting up NAT (eth0 → wlan0)..."
@@ -137,6 +136,5 @@ echo "  Access HA at:                      "
 echo "    http://192.168.50.1:8123         "
 echo "======================================"
 echo ""
-read -p "Press ENTER to reboot now or CTRL+C to cancel..."
 
 sudo reboot
