@@ -115,14 +115,14 @@ echo 'DAEMON_CONF="/etc/hostapd/hostapd.conf"' | sudo tee -a /etc/default/hostap
 
 # Set static IP for wlan0
 echo "Configuring static IP for wlan0..."
-echo -e "\ninterface wlan0\n    static ip_address=192.168.4.1/24\n    nohook wpa_supplicant" | sudo tee -a /etc/dhcpcd.conf
+echo -e "\ninterface wlan0\n    static ip_address=192.168.50.1/24\n    nohook wpa_supplicant" | sudo tee -a /etc/dhcpcd.conf
 
 # Configure dnsmasq
 echo "Configuring dnsmasq..."
 sudo mv /etc/dnsmasq.conf /etc/dnsmasq.conf.orig || true
 sudo tee /etc/dnsmasq.conf > /dev/null <<EOF
 interface=wlan0
-dhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h
+dhcp-range=192.168.50.2,192.168.50.20,255.255.255.0,24h
 EOF
 
 # Enable hostapd and dnsmasq
@@ -145,7 +145,7 @@ echo "    Password: CamperPi                 "
 echo "  Kodi will start on next reboot.     "
 echo "  Home Assistant is running now.      "
 echo "  Access Home Assistant at:           "
-echo "    http://$(hostname -I | awk '{print $1}'):8123"
+echo "    http://192.168.50.1:8123"
 echo "======================================"
 echo ""
 read -p "Press ENTER to reboot now or CTRL+C to cancel..."
