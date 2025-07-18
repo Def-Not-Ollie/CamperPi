@@ -141,4 +141,14 @@ echo ""
 echo "======================================"
 echo "  Setup complete!                      "
 echo "  Wi-Fi Access Point details:         "
-echo "    SSID:
+echo "    SSID: CamperPi                    "
+echo "    Password: CamperPi                 "
+echo "  Kodi will start on next reboot.     "
+echo "  Home Assistant is running now.      "
+echo "  Access Home Assistant at:           "
+echo "    http://192.168.50.1:8123"
+echo "======================================"
+echo ""
+read -p "Press ENTER to reboot now or CTRL+C to cancel..."
+
+sudo reboot
