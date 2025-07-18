@@ -120,6 +120,9 @@ sudo systemctl unmask hostapd
 sudo systemctl enable hostapd
 sudo systemctl enable dnsmasq
 sudo systemctl restart hostapd
+
+sleep 5  # wait for wlan0 and hostapd to be ready
+
 sudo systemctl restart dnsmasq
 
 sudo systemctl is-active hostapd && echo "hostapd is running" || echo "hostapd NOT running"
