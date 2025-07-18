@@ -92,6 +92,11 @@ EOF
 sudo systemctl daemon-reload
 sudo systemctl enable kodi
 
+# Stop conflicting services before Wi-Fi AP setup
+echo "Stopping wpa_supplicant and NetworkManager to free wlan0..."
+sudo systemctl stop wpa_supplicant
+sudo systemctl stop NetworkManager
+
 # Setup Wi-Fi Access Point
 echo "Setting up Wi-Fi Access Point on wlan0..."
 sudo tee /etc/hostapd/hostapd.conf > /dev/null <<EOF
