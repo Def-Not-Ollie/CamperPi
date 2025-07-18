@@ -6,12 +6,6 @@ HA_CONFIG_DIR="/home/$USER/homeassistant"
 
 echo "Starting CamperPi setup as $USER..."
 
-echo "Setting Wi-Fi country to AU..."
-sudo raspi-config nonint do_wifi_country AU
-
-echo "Unblocking Wi-Fi..."
-sudo rfkill unblock wifi
-
 echo "Syncing time..."
 sudo timedatectl set-ntp on
 sudo systemctl restart systemd-timesyncd
@@ -111,25 +105,17 @@ interface=wlan0
 dhcp-range=192.168.50.2,192.168.50.20,255.255.255.0,24h
 EOF
 
-echo "Stopping wpa_supplicant and resetting wlan0 for AP mode..."
-sudo systemctl stop wpa_supplicant
-sudo ip link set wlan0 down
-sudo ip link set wlan0 up
-
+echo "Enabling hostapd and dnsmasq to start on boot..."
 sudo systemctl unmask hostapd
-sudo systemctl enable hostapd
-sudo systemctl enable dnsmasq
+sudo systemctl enable hostapd dnsmasq
+
 sudo systemctl restart hostapd
-
-sleep 5  # wait for wlan0 and hostapd to be ready
-
 sudo systemctl restart dnsmasq
 
 sudo systemctl is-active hostapd && echo "hostapd is running" || echo "hostapd NOT running"
 sudo systemctl is-active dnsmasq && echo "dnsmasq is running" || echo "dnsmasq NOT running"
 
 ip addr show wlan0 | grep 'inet ' || echo "No IP on wlan0"
-rfkill list wlan
 
 echo "Setting up NAT (eth0 → wlan0)..."
 sudo iptables -t nat -A POSTROUTING -o wlan0 -j MASQUERADE
