@@ -31,8 +31,8 @@ mkdir -p "$HA_CONFIG_DIR"
 if sudo docker ps -a --format '{{.Names}}' | grep -q '^homeassistant$'; then
     echo "Home Assistant container exists. Skipping creation."
 else
-    echo "Creating Home Assistant container (starts on reboot)..."
-    sudo docker create --name homeassistant --restart=unless-stopped --privileged -v "$HA_CONFIG_DIR:/config" --network=host ghcr.io/home-assistant/home-assistant:stable
+    echo "Creating and starting Home Assistant container..."
+    sudo docker run -d --name homeassistant --restart=unless-stopped --privileged -v "$HA_CONFIG_DIR:/config" --network=host ghcr.io/home-assistant/home-assistant:stable
 fi
 
 echo "Creating Home Assistant service..."
@@ -131,12 +131,9 @@ echo "  Setup complete!                     "
 echo "  Wi-Fi Access Point:                 "
 echo "    SSID: CamperPi                    "
 echo "    Password: CamperPi                "
-echo ""
-echo "  Hotspot IP address:"
-ip addr show wlan0 | grep 'inet '
-echo ""
-echo "  Kodi & Home Assistant will start    "
-echo "  after reboot. Access HA at:        "
+echo "  Kodi will start after reboot.      "
+echo "  Home Assistant started now.        "
+echo "  Access HA at:                      "
 echo "    http://192.168.50.1:8123         "
 echo "======================================"
 echo ""
