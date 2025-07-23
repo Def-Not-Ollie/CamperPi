@@ -134,5 +134,4 @@ systemctl is-active hostapd && echo "hostapd running" || echo "hostapd NOT runni
 systemctl is-active dnsmasq && echo "dnsmasq running" || echo "dnsmasq NOT running"
 echo "Setup complete. Rebooting now... Access Home Assistant at http://$IP_ADDR:8123"
 
-sleep 2
 reboot
