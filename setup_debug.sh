@@ -130,10 +130,9 @@ fi
 netfilter-persistent save
 
 # --- Summary ---
-systemctl is-active hostapd && echo "✅ hostapd running" || echo "❌ hostapd NOT running"
-systemctl is-active dnsmasq && echo "✅ dnsmasq running" || echo "❌ dnsmasq NOT running"
-echo "Hotspot IP: http://$IP_ADDR:8123"
+systemctl is-active hostapd && echo "hostapd running" || echo "hostapd NOT running"
+systemctl is-active dnsmasq && echo "dnsmasq running" || echo "dnsmasq NOT running"
+echo "Setup complete. Rebooting now... Access Home Assistant at http://$IP_ADDR:8123"
 
-echo "Setup complete. Rebooting now..."
 sleep 2
 reboot
