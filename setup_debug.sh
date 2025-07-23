@@ -17,7 +17,7 @@ echo iptables-persistent iptables-persistent/autosave_v6 boolean true | sudo deb
 echo "Installing packages..."
 sudo apt update
 sudo apt full-upgrade -y
-sudo apt install -y kodi docker.io docker-compose iptables-persistent netfilter-persistent
+sudo apt install -y kodi docker.io docker-compose hostapd dnsmasq iptables-persistent netfilter-persistent
 
 echo "Enabling Docker..."
 sudo systemctl enable docker
@@ -74,6 +74,62 @@ EOF
 
 sudo systemctl daemon-reload
 sudo systemctl enable kodi
+
+echo "Configuring static IP and DHCP for wlan0 (Wi-Fi AP)..."
+sudo tee /etc/hostapd/hostapd.conf > /dev/null <<EOF
+interface=wlan0
+driver=nl80211
+ssid=CamperPi
+hw_mode=g
+channel=7
+wmm_enabled=0
+macaddr_acl=0
+auth_algs=1
+ignore_broadcast_ssid=0
+wpa=2
+wpa_passphrase=CamperPi
+wpa_key_mgmt=WPA-PSK
+rsn_pairwise=CCMP
+EOF
+
+sudo sed -i '/^DAEMON_CONF=/d' /etc/default/hostapd
+echo 'DAEMON_CONF="/etc/hostapd/hostapd.conf"' | sudo tee -a /etc/default/hostapd
+
+# Static IP for wlan0
+if ! grep -q "^interface wlan0" /etc/dhcpcd.conf; then
+  echo -e "\ninterface wlan0\n    static ip_address=192.168.50.1/24\n    nohook wpa_supplicant" | sudo tee -a /etc/dhcpcd.conf
+fi
+
+echo "Configuring static IP and DHCP for eth0 (local network)..."
+# Static IP for eth0 (different subnet)
+if ! grep -q "^interface eth0" /etc/dhcpcd.conf; then
+  echo -e "\ninterface eth0\n    static ip_address=192.168.51.1/24\n    nohook wpa_supplicant" | sudo tee -a /etc/dhcpcd.conf
+fi
+
+echo "Configuring dnsmasq for wlan0 and eth0..."
+sudo mv /etc/dnsmasq.conf /etc/dnsmasq.conf.orig 2>/dev/null || true
+sudo tee /etc/dnsmasq.conf > /dev/null <<EOF
+interface=wlan0
+dhcp-range=192.168.50.2,192.168.50.20,255.255.255.0,24h
+
+interface=eth0
+dhcp-range=192.168.51.2,192.168.51.20,255.255.255.0,24h
+EOF
+
+echo "Enabling and starting hostapd and dnsmasq..."
+sudo systemctl unmask hostapd
+sudo systemctl enable hostapd dnsmasq
+sudo systemctl restart hostapd
+sudo systemctl restart dnsmasq
+
+echo "Enabling IP forwarding..."
+echo "net.ipv4.ip_forward=1" | sudo tee -a /etc/sysctl.conf
+sudo sysctl -w net.ipv4.ip_forward=1
+
+echo "Setting up NAT for outbound internet via eth0..."
+# NAT for both wlan0 and eth0 networks going out to upstream (assumed on eth0)
+sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+sudo netfilter-persistent save
 
 echo "Setup complete."
 
