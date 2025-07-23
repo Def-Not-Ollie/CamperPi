@@ -17,7 +17,7 @@ echo iptables-persistent iptables-persistent/autosave_v6 boolean true | sudo deb
 echo "Installing packages..."
 sudo apt update
 sudo apt full-upgrade -y
-sudo apt install -y kodi docker.io docker-compose hostapd dnsmasq iptables-persistent netfilter-persistent
+sudo apt install -y kodi docker.io docker-compose iptables-persistent netfilter-persistent
 
 echo "Enabling Docker..."
 sudo systemctl enable docker
@@ -75,50 +75,5 @@ EOF
 sudo systemctl daemon-reload
 sudo systemctl enable kodi
 
-echo "Setting up Wi-Fi Access Point..."
-sudo tee /etc/hostapd/hostapd.conf > /dev/null <<EOF
-interface=wlan0
-driver=nl80211
-ssid=CamperPi
-hw_mode=g
-channel=7
-wmm_enabled=0
-macaddr_acl=0
-auth_algs=1
-ignore_broadcast_ssid=0
-wpa=2
-wpa_passphrase=CamperPi
-wpa_key_mgmt=WPA-PSK
-rsn_pairwise=CCMP
-EOF
-
-sudo sed -i '/^DAEMON_CONF=/d' /etc/default/hostapd
-echo 'DAEMON_CONF="/etc/hostapd/hostapd.conf"' | sudo tee -a /etc/default/hostapd
-
-echo "Configuring static IP for wlan0..."
-echo -e "\ninterface wlan0\n    static ip_address=192.168.50.1/24\n    nohook wpa_supplicant" | sudo tee -a /etc/dhcpcd.conf
-
-echo "Configuring dnsmasq..."
-sudo mv /etc/dnsmasq.conf /etc/dnsmasq.conf.orig 2>/dev/null || true
-sudo tee /etc/dnsmasq.conf > /dev/null <<EOF
-interface=wlan0
-dhcp-range=192.168.50.2,192.168.50.20,255.255.255.0,24h
-EOF
-
-echo "Enabling hostapd and dnsmasq to start on boot..."
-sudo systemctl unmask hostapd
-sudo systemctl enable hostapd dnsmasq
-
-sudo systemctl restart hostapd
-sudo systemctl restart dnsmasq
-
-sudo systemctl is-active hostapd && echo "hostapd is running" || echo "hostapd NOT running"
-sudo systemctl is-active dnsmasq && echo "dnsmasq is running" || echo "dnsmasq NOT running"
-
-ip addr show wlan0 | grep 'inet ' || echo "No IP on wlan0"
-
-echo "Setting up NAT (eth0 → wlan0)..."
-sudo iptables -t nat -A POSTROUTING -o wlan0 -j MASQUERADE
-sudo netfilter-persistent save
-
+echo "Setup complete. Rebooting..."
 sudo reboot
