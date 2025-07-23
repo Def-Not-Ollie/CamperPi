@@ -3,12 +3,11 @@ set -euxo pipefail
 
 USER=$(whoami)
 HA_CONFIG_DIR="/home/$USER/homeassistant"
+IP_ADDR="192.168.50.1"
 
 echo "Starting CamperPi setup as $USER..."
 
-echo "Unblocking Wi-Fi..."
-rfkill unblock wifi || true
-
+# --- System Prep ---
 echo "Syncing time..."
 timedatectl set-ntp on
 systemctl restart systemd-timesyncd
@@ -23,26 +22,21 @@ DEBIAN_FRONTEND=noninteractive apt full-upgrade -y
 DEBIAN_FRONTEND=noninteractive apt install -y \
   kodi docker.io docker-compose \
   hostapd dnsmasq iptables-persistent netfilter-persistent \
-  dhcpcd5 rfkill
+  dhcpcd5
 
-echo "Enabling and starting dhcpcd..."
-systemctl enable dhcpcd
-systemctl start dhcpcd
+echo "Enabling and starting required services..."
+systemctl enable --now docker
+systemctl enable --now dhcpcd
 
-echo "Enabling Docker..."
-systemctl enable docker
-systemctl start docker
-
+# --- Home Assistant Setup ---
 echo "Setting up Home Assistant..."
 mkdir -p "$HA_CONFIG_DIR"
 chown "$USER:$USER" "$HA_CONFIG_DIR"
-if docker ps -a --format '{{.Names}}' | grep -q '^homeassistant$'; then
-    echo "Home Assistant container exists. Skipping creation."
-else
-    echo "Creating Home Assistant container..."
-    docker create --name homeassistant --restart=unless-stopped --privileged \
-      -v "$HA_CONFIG_DIR:/config" --network=host \
-      ghcr.io/home-assistant/home-assistant:stable
+
+if ! docker ps -a --format '{{.Names}}' | grep -q '^homeassistant$'; then
+  docker create --name homeassistant --restart=unless-stopped --privileged \
+    -v "$HA_CONFIG_DIR:/config" --network=host \
+    ghcr.io/home-assistant/home-assistant:stable
 fi
 
 echo "Creating Home Assistant service..."
@@ -64,9 +58,7 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
-systemctl daemon-reload
-systemctl enable home-assistant
-
+# --- Kodi Service ---
 echo "Creating Kodi service..."
 tee /etc/systemd/system/kodi.service > /dev/null <<EOF
 [Unit]
@@ -85,9 +77,11 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
+# Reload once for both new services
 systemctl daemon-reload
-systemctl enable kodi
+systemctl enable home-assistant kodi
 
+# --- Wi-Fi Access Point ---
 echo "Setting up Wi-Fi Access Point..."
 tee /etc/hostapd/hostapd.conf > /dev/null <<EOF
 interface=wlan0
@@ -106,11 +100,16 @@ rsn_pairwise=CCMP
 EOF
 
 sed -i '/^DAEMON_CONF=/d' /etc/default/hostapd
-echo 'DAEMON_CONF="/etc/hostapd/hostapd.conf"' | tee -a /etc/default/hostapd
+echo 'DAEMON_CONF="/etc/hostapd/hostapd.conf"' >> /etc/default/hostapd
 
 echo "Configuring static IP for wlan0..."
 if ! grep -q "interface wlan0" /etc/dhcpcd.conf; then
-  echo -e "\ninterface wlan0\n    static ip_address=192.168.50.1/24\n    nohook wpa_supplicant" | tee -a /etc/dhcpcd.conf
+  cat <<EOF >> /etc/dhcpcd.conf
+
+interface wlan0
+    static ip_address=${IP_ADDR}/24
+    nohook wpa_supplicant
+EOF
 fi
 
 echo "Configuring dnsmasq..."
@@ -121,23 +120,20 @@ dhcp-range=192.168.50.2,192.168.50.20,255.255.255.0,24h
 EOF
 
 systemctl unmask hostapd
-systemctl enable hostapd dnsmasq
-systemctl restart hostapd
-systemctl restart dnsmasq
+systemctl enable --now hostapd dnsmasq
 
-systemctl is-active hostapd && echo "✅ hostapd running" || echo "❌ hostapd NOT running"
-systemctl is-active dnsmasq && echo "✅ dnsmasq running" || echo "❌ dnsmasq NOT running"
-
-ip_addr="192.168.50.1"
-echo "Hotspot IP: $ip_addr"
-
-# Add NAT rule if not present
+# --- Network Routing ---
+echo "Configuring NAT routing..."
 if ! iptables -t nat -C POSTROUTING -o wlan0 -j MASQUERADE 2>/dev/null; then
-    iptables -t nat -A POSTROUTING -o wlan0 -j MASQUERADE
+  iptables -t nat -A POSTROUTING -o wlan0 -j MASQUERADE
 fi
 netfilter-persistent save
 
-echo "Setup complete. Rebooting now. Access Home Assistant at http://$ip_addr:8123"
+# --- Summary ---
+systemctl is-active hostapd && echo "✅ hostapd running" || echo "❌ hostapd NOT running"
+systemctl is-active dnsmasq && echo "✅ dnsmasq running" || echo "❌ dnsmasq NOT running"
+echo "Hotspot IP: http://$IP_ADDR:8123"
 
+echo "Setup complete. Rebooting now..."
 sleep 2
 reboot
