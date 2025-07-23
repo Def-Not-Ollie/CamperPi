@@ -104,6 +104,10 @@ if ! grep -q "interface wlan0" /etc/dhcpcd.conf; then
   echo -e "\ninterface wlan0\n    static ip_address=192.168.50.1/24\n    nohook wpa_supplicant" | sudo tee -a /etc/dhcpcd.conf
 fi
 
+echo "Restarting dhcpcd to apply static IP..."
+sudo systemctl restart dhcpcd
+sleep 3
+
 echo "Configuring dnsmasq..."
 sudo mv /etc/dnsmasq.conf /etc/dnsmasq.conf.orig 2>/dev/null || true
 sudo tee /etc/dnsmasq.conf > /dev/null <<EOF
