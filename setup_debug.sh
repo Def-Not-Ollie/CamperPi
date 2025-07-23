@@ -18,9 +18,9 @@ echo iptables-persistent iptables-persistent/autosave_v4 boolean true | sudo deb
 echo iptables-persistent iptables-persistent/autosave_v6 boolean true | sudo debconf-set-selections
 
 echo "Installing packages..."
-sudo apt update
-sudo apt full-upgrade -y
-sudo apt install -y kodi docker.io docker-compose hostapd dnsmasq iptables-persistent netfilter-persistent
+sudo DEBIAN_FRONTEND=noninteractive apt update
+sudo DEBIAN_FRONTEND=noninteractive apt full-upgrade -y
+sudo DEBIAN_FRONTEND=noninteractive apt install -y kodi docker.io docker-compose hostapd dnsmasq iptables-persistent netfilter-persistent
 
 echo "Enabling Docker..."
 sudo systemctl enable docker
@@ -103,10 +103,6 @@ echo "Configuring static IP for wlan0..."
 if ! grep -q "interface wlan0" /etc/dhcpcd.conf; then
   echo -e "\ninterface wlan0\n    static ip_address=192.168.50.1/24\n    nohook wpa_supplicant" | sudo tee -a /etc/dhcpcd.conf
 fi
-
-echo "Restarting dhcpcd to apply static IP..."
-sudo systemctl restart dhcpcd
-sleep 3
 
 echo "Configuring dnsmasq..."
 sudo mv /etc/dnsmasq.conf /etc/dnsmasq.conf.orig 2>/dev/null || true
