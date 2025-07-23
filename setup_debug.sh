@@ -119,7 +119,7 @@ sudo systemctl restart dnsmasq
 sudo systemctl is-active hostapd && echo "✅ hostapd running" || echo "❌ hostapd NOT running"
 sudo systemctl is-active dnsmasq && echo "✅ dnsmasq running" || echo "❌ dnsmasq NOT running"
 
-ip_addr=$(ip -4 addr show wlan0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
+ip_addr="192.168.50.1"
 echo "Hotspot IP: $ip_addr"
 
 # Add NAT rule if not present (avoid duplicates)
