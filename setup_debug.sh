@@ -20,7 +20,14 @@ echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-
 echo "Installing packages..."
 DEBIAN_FRONTEND=noninteractive apt update
 DEBIAN_FRONTEND=noninteractive apt full-upgrade -y
-DEBIAN_FRONTEND=noninteractive apt install -y kodi docker.io docker-compose hostapd dnsmasq iptables-persistent netfilter-persistent
+DEBIAN_FRONTEND=noninteractive apt install -y \
+  kodi docker.io docker-compose \
+  hostapd dnsmasq iptables-persistent netfilter-persistent \
+  dhcpcd5 rfkill
+
+echo "Enabling and starting dhcpcd..."
+systemctl enable dhcpcd
+systemctl start dhcpcd
 
 echo "Enabling Docker..."
 systemctl enable docker
@@ -28,12 +35,14 @@ systemctl start docker
 
 echo "Setting up Home Assistant..."
 mkdir -p "$HA_CONFIG_DIR"
-chown "$USER":"$USER" "$HA_CONFIG_DIR"
+chown "$USER:$USER" "$HA_CONFIG_DIR"
 if docker ps -a --format '{{.Names}}' | grep -q '^homeassistant$'; then
     echo "Home Assistant container exists. Skipping creation."
 else
     echo "Creating Home Assistant container..."
-    docker create --name homeassistant --restart=unless-stopped --privileged -v "$HA_CONFIG_DIR:/config" --network=host ghcr.io/home-assistant/home-assistant:stable
+    docker create --name homeassistant --restart=unless-stopped --privileged \
+      -v "$HA_CONFIG_DIR:/config" --network=host \
+      ghcr.io/home-assistant/home-assistant:stable
 fi
 
 echo "Creating Home Assistant service..."
@@ -131,5 +140,4 @@ netfilter-persistent save
 echo "Setup complete. Rebooting now. Access Home Assistant at http://$ip_addr:8123"
 
 sleep 2
-# No prompt here, reboot immediately
 reboot
