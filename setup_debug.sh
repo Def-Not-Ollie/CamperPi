@@ -25,8 +25,8 @@ DEBIAN_FRONTEND=noninteractive apt install -y \
   dhcpcd5
 
 echo "Enabling and starting required services..."
-systemctl enable --now docker
-systemctl enable --now dhcpcd
+systemctl enable docker dhcpcd
+systemctl start docker dhcpcd
 
 # --- Home Assistant Setup ---
 echo "Setting up Home Assistant..."
@@ -120,7 +120,18 @@ dhcp-range=192.168.50.2,192.168.50.20,255.255.255.0,24h
 EOF
 
 systemctl unmask hostapd
-systemctl enable --now hostapd dnsmasq
+systemctl enable hostapd dnsmasq
+
+echo "Starting hostapd and dnsmasq..."
+systemctl restart hostapd dnsmasq
+
+# Wait for services to be fully active
+for svc in hostapd dnsmasq docker dhcpcd; do
+  echo "Waiting for $svc to be active..."
+  until systemctl is-active --quiet $svc; do
+    sleep 1
+  done
+done
 
 # --- Network Routing ---
 echo "Configuring NAT routing..."
