@@ -10,6 +10,10 @@ echo "Syncing time..."
 sudo timedatectl set-ntp on
 sudo systemctl restart systemd-timesyncd
 
+echo "Unblocking Wi-Fi with rfkill..."
+sudo rfkill unblock wifi
+sudo rfkill unblock all
+
 echo "Preconfiguring iptables-persistent..."
 echo iptables-persistent iptables-persistent/autosave_v4 boolean true | sudo debconf-set-selections
 echo iptables-persistent iptables-persistent/autosave_v6 boolean true | sudo debconf-set-selections
@@ -75,7 +79,7 @@ EOF
 sudo systemctl daemon-reload
 sudo systemctl enable kodi
 
-echo "Configuring static IP and DHCP for wlan0 (Wi-Fi AP)..."
+echo "Setting up Wi-Fi Access Point..."
 sudo tee /etc/hostapd/hostapd.conf > /dev/null <<EOF
 interface=wlan0
 driver=nl80211
@@ -95,23 +99,15 @@ EOF
 sudo sed -i '/^DAEMON_CONF=/d' /etc/default/hostapd
 echo 'DAEMON_CONF="/etc/hostapd/hostapd.conf"' | sudo tee -a /etc/default/hostapd
 
-# Static IP for wlan0
-if ! grep -q "^interface wlan0" /etc/dhcpcd.conf; then
-  echo -e "\ninterface wlan0\n    static ip_address=192.168.50.1/24\n    nohook wpa_supplicant" | sudo tee -a /etc/dhcpcd.conf
-fi
-
-echo "Configuring static IP and DHCP for eth0 (local network)..."
-# Static IP for eth0 (different subnet)
-if ! grep -q "^interface eth0" /etc/dhcpcd.conf; then
-  echo -e "\ninterface eth0\n    static ip_address=192.168.51.1/24\n    nohook wpa_supplicant" | sudo tee -a /etc/dhcpcd.conf
-fi
+echo "Configuring static IPs for wlan0 and eth0..."
+echo -e "\ninterface wlan0\n    static ip_address=192.168.50.1/24\n    nohook wpa_supplicant" | sudo tee -a /etc/dhcpcd.conf
+echo -e "\ninterface eth0\n    static ip_address=192.168.51.1/24\n    nohook wpa_supplicant" | sudo tee -a /etc/dhcpcd.conf
 
 echo "Configuring dnsmasq for wlan0 and eth0..."
 sudo mv /etc/dnsmasq.conf /etc/dnsmasq.conf.orig 2>/dev/null || true
 sudo tee /etc/dnsmasq.conf > /dev/null <<EOF
 interface=wlan0
 dhcp-range=192.168.50.2,192.168.50.20,255.255.255.0,24h
-
 interface=eth0
 dhcp-range=192.168.51.2,192.168.51.20,255.255.255.0,24h
 EOF
@@ -119,22 +115,21 @@ EOF
 echo "Enabling and starting hostapd and dnsmasq..."
 sudo systemctl unmask hostapd
 sudo systemctl enable hostapd dnsmasq
-sudo systemctl restart hostapd
+sudo systemctl restart hostapd || echo "⚠️ hostapd failed to start — check with: journalctl -xeu hostapd"
 sudo systemctl restart dnsmasq
 
-echo "Enabling IP forwarding..."
-echo "net.ipv4.ip_forward=1" | sudo tee -a /etc/sysctl.conf
-sudo sysctl -w net.ipv4.ip_forward=1
+sudo systemctl is-active hostapd && echo "✅ hostapd is running" || echo "❌ hostapd NOT running"
+sudo systemctl is-active dnsmasq && echo "✅ dnsmasq is running" || echo "❌ dnsmasq NOT running"
 
-echo "Setting up NAT for outbound internet via eth0..."
-# NAT for both wlan0 and eth0 networks going out to upstream (assumed on eth0)
+ip addr show wlan0 | grep 'inet ' || echo "❌ No IP on wlan0"
+ip addr show eth0 | grep 'inet ' || echo "❌ No IP on eth0"
+
+echo "Setting up NAT (routing)..."
+sudo iptables -t nat -A POSTROUTING -o wlan0 -j MASQUERADE
 sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
 sudo netfilter-persistent save
 
-echo "Setup complete."
+# Print access info
+echo "Setup complete, Rebooting Now."
 
-IP=$(hostname -I | awk '{print $1}')
-echo "Access Home Assistant at: http://$IP:8123"
-
-echo "Rebooting..."
 sudo reboot
