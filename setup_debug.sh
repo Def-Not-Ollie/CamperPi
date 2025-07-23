@@ -27,7 +27,8 @@ sudo systemctl enable docker
 sudo systemctl start docker
 
 echo "Setting up Home Assistant..."
-mkdir -p "$HA_CONFIG_DIR"
+sudo mkdir -p "$HA_CONFIG_DIR"
+sudo chown "$USER":"$USER" "$HA_CONFIG_DIR"
 if sudo docker ps -a --format '{{.Names}}' | grep -q '^homeassistant$'; then
     echo "Home Assistant container exists. Skipping creation."
 else
@@ -99,7 +100,9 @@ sudo sed -i '/^DAEMON_CONF=/d' /etc/default/hostapd
 echo 'DAEMON_CONF="/etc/hostapd/hostapd.conf"' | sudo tee -a /etc/default/hostapd
 
 echo "Configuring static IP for wlan0..."
-echo -e "\ninterface wlan0\n    static ip_address=192.168.50.1/24\n    nohook wpa_supplicant" | sudo tee -a /etc/dhcpcd.conf
+if ! grep -q "interface wlan0" /etc/dhcpcd.conf; then
+  echo -e "\ninterface wlan0\n    static ip_address=192.168.50.1/24\n    nohook wpa_supplicant" | sudo tee -a /etc/dhcpcd.conf
+fi
 
 echo "Configuring dnsmasq..."
 sudo mv /etc/dnsmasq.conf /etc/dnsmasq.conf.orig 2>/dev/null || true
@@ -116,7 +119,8 @@ sudo systemctl restart dnsmasq
 sudo systemctl is-active hostapd && echo "✅ hostapd running" || echo "❌ hostapd NOT running"
 sudo systemctl is-active dnsmasq && echo "✅ dnsmasq running" || echo "❌ dnsmasq NOT running"
 
-ip addr show wlan0 | grep 'inet ' | awk '{print "Hotspot IP: "$2}'
+ip_addr=$(ip -4 addr show wlan0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
+echo "Hotspot IP: $ip_addr"
 
 # Add NAT rule if not present (avoid duplicates)
 if ! sudo iptables -t nat -C POSTROUTING -o wlan0 -j MASQUERADE 2>/dev/null; then
@@ -125,16 +129,10 @@ fi
 sudo netfilter-persistent save
 
 echo ""
-echo "======================================"
-echo "  Setup complete!                     "
-echo "  Wi-Fi Access Point:                 "
-echo "    SSID: CamperPi                   "
-echo "    Password: CamperPi               "
-echo "  Kodi & Home Assistant will start   "
-echo "  after reboot. Access HA at:        "
-echo "    http://192.168.50.1:8123        "
-echo "======================================"
+echo "Setup complete. Rebooting now. Access Home Assistant at http://$ip_addr:8123"
 echo ""
+
+sleep 2
 read -p "Press ENTER to reboot now or CTRL+C to cancel..."
 
 sudo reboot
