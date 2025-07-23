@@ -75,5 +75,10 @@ EOF
 sudo systemctl daemon-reload
 sudo systemctl enable kodi
 
-echo "Setup complete. Rebooting..."
+echo "Setup complete."
+
+IP=$(hostname -I | awk '{print $1}')
+echo "Access Home Assistant at: http://$IP:8123"
+
+echo "Rebooting..."
 sudo reboot
