@@ -10,14 +10,10 @@ echo "Syncing time..."
 sudo timedatectl set-ntp on
 sudo systemctl restart systemd-timesyncd
 
-echo "Unblocking Wi-Fi with rfkill..."
-sudo rfkill unblock wifi
-sudo rfkill unblock all
-
 echo "Installing packages..."
 sudo apt update
 sudo apt full-upgrade -y
-sudo apt install -y kodi docker.io docker-compose hostapd dnsmasq
+sudo apt install -y kodi docker.io docker-compose
 
 echo "Enabling Docker..."
 sudo systemctl enable docker
