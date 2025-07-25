@@ -37,7 +37,7 @@ mkdir -p "$HA_CONFIG_DIR"
 chown "$USER:$USER" "$HA_CONFIG_DIR"
 
 if ! docker ps -a --format '{{.Names}}' | grep -q '^homeassistant$'; then
-  docker create --name homeassistant --restart=unless-stopped --privileged \
+  docker run -d --name homeassistant --restart=unless-stopped --privileged \
     -v "$HA_CONFIG_DIR:/config" --network=host \
     ghcr.io/home-assistant/home-assistant:stable
 fi
