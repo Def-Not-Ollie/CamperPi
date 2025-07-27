@@ -14,7 +14,6 @@ Create the service file:
 sudo nano /etc/systemd/system/kodi.service
 ```
 
-Paste the following (replace `admin` with your username or keep `$USER`):
 
 ```
 [Unit]
@@ -57,7 +56,6 @@ Create the service file:
 sudo nano /etc/systemd/system/home-assistant.service
 ```
 
-Paste the following (replace `admin` with your username or keep `$USER`):
 
 ```
 [Unit]
