@@ -96,5 +96,5 @@ EOF
 systemctl daemon-reload
 systemctl enable kodi
 
-echo "Setup complete."
-read -p "Reboot now? (y/n): " confirm && [[ $confirm == [yY] ]] && reboot
+echo "Setup complete. Rebooting now..."
+reboot
