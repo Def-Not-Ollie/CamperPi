@@ -46,13 +46,7 @@ sudo systemctl start kodi
 ```bash
 mkdir -p ~/homeassistant
 cd ~/homeassistant
-sudo docker run -d \
-  --name homeassistant \
-  --restart=unless-stopped \
-  --privileged \
-  -v ~/homeassistant:/config \
-  --network=host \
-  ghcr.io/home-assistant/home-assistant:stable
+sudo docker run -d   --name homeassistant   --restart=unless-stopped   --privileged   -v ~/homeassistant:/config   --network=host   ghcr.io/home-assistant/home-assistant:stable
 ```
 
 ## **4. Create Home Assistant systemd Service**
@@ -114,3 +108,162 @@ sudo systemctl status home-assistant
 ```
 
 - **Access Home Assistant at:** `http://<Pi-IP>:8123`
+
+---
+
+## **7. Set Up Local Network: DHCP, WiFi AP & Ethernet LAN**
+
+### 7.1 Install required packages
+
+```bash
+sudo apt install -y hostapd dnsmasq
+sudo systemctl stop hostapd
+sudo systemctl stop dnsmasq
+```
+
+### 7.2 Configure static IP for Ethernet (LAN port)
+
+Edit dhcpcd config:
+
+```bash
+sudo nano /etc/dhcpcd.conf
+```
+
+Add at the end:
+
+```
+interface eth0
+static ip_address=192.168.50.1/24
+nohook wpa_supplicant
+```
+
+Save and exit.
+
+Restart dhcpcd:
+
+```bash
+sudo systemctl restart dhcpcd
+```
+
+### 7.3 Configure DHCP server (dnsmasq)
+
+Backup default config:
+
+```bash
+sudo mv /etc/dnsmasq.conf /etc/dnsmasq.conf.orig
+```
+
+Create new config file:
+
+```bash
+sudo nano /etc/dnsmasq.conf
+```
+
+Add:
+
+```
+interface=eth0
+dhcp-range=192.168.50.2,192.168.50.100,255.255.255.0,24h
+```
+
+Save and exit.
+
+### 7.4 Configure WiFi Access Point (hostapd)
+
+Create hostapd config:
+
+```bash
+sudo nano /etc/hostapd/hostapd.conf
+```
+
+Example config (change SSID and password):
+
+```
+interface=wlan0
+driver=nl80211
+ssid=PiAP
+hw_mode=g
+channel=7
+wmm_enabled=0
+macaddr_acl=0
+auth_algs=1
+ignore_broadcast_ssid=0
+wpa=2
+wpa_passphrase=YourStrongPassword
+wpa_key_mgmt=WPA-PSK
+rsn_pairwise=CCMP
+```
+
+Link config in defaults file:
+
+```bash
+sudo nano /etc/default/hostapd
+```
+
+Set:
+
+```
+DAEMON_CONF="/etc/hostapd/hostapd.conf"
+```
+
+### 7.5 Enable IP forwarding (optional for internet sharing)
+
+Edit sysctl:
+
+```bash
+sudo nano /etc/sysctl.conf
+```
+
+Uncomment:
+
+```
+net.ipv4.ip_forward=1
+```
+
+Apply immediately:
+
+```bash
+sudo sysctl -w net.ipv4.ip_forward=1
+```
+
+### 7.6 (Optional) Setup NAT for internet sharing
+
+```bash
+sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+sudo sh -c "iptables-save > /etc/iptables.ipv4.nat"
+```
+
+Edit `/etc/rc.local`:
+
+```bash
+sudo nano /etc/rc.local
+```
+
+Add above `exit 0`:
+
+```
+iptables-restore < /etc/iptables.ipv4.nat
+```
+
+### 7.7 Enable and start services
+
+```bash
+sudo systemctl unmask hostapd
+sudo systemctl enable hostapd
+sudo systemctl restart hostapd
+sudo systemctl restart dnsmasq
+sudo systemctl restart dhcpcd
+```
+
+### 7.8 Connect your Waveshare relay to Ethernet port
+
+It should receive an IP between `192.168.50.2` and `192.168.50.100`.
+
+---
+
+You’re all set! Your Pi now provides:
+
+- Ethernet LAN with static IP and DHCP  
+- WiFi Access Point with your chosen SSID and password  
+
+Let me know if you want help adding internet sharing or firewall rules.
