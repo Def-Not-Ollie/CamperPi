@@ -1,62 +1,57 @@
 #!/bin/bash
 set -euxo pipefail
 
-# Check for root or sudo
+export DEBIAN_FRONTEND=noninteractive
+
+# Ensure script runs as root
 if [[ $EUID -ne 0 ]]; then
-  echo "This script must be run as root or with sudo."
+  echo "Run as root or with sudo."
   exit 1
 fi
 
-echo "Starting setup for Raspberry Pi OS Lite 64-bit..."
+echo "Starting setup for Raspberry Pi OS Lite 64-bit (headless)..."
+
+# Ensure sudo exists
+apt-get update -y
+apt-get install -y sudo
 
 USER=${SUDO_USER:-$(whoami)}
 HA_CONFIG_DIR="/home/$USER/homeassistant"
 
-# Ensure HA config dir exists and is writable by USER
-if [[ ! -d "$HA_CONFIG_DIR" ]]; then
-  mkdir -p "$HA_CONFIG_DIR"
-fi
+# Ensure HA config dir exists and is writable
+mkdir -p "$HA_CONFIG_DIR"
 chown "$USER:$USER" "$HA_CONFIG_DIR"
 
-# Get system timezone
-TZ=$(timedatectl show -p Timezone --value)
+# Get timezone
+TZ=$(timedatectl show -p Timezone --value || echo "UTC")
 echo "Using timezone: $TZ"
 
 # --- Install Kodi ---
 echo "Installing Kodi..."
-apt update -y
-if ! apt install -y kodi; then
-  echo "Error: Kodi installation failed."
-  exit 1
-fi
+apt-get install -y kodi
 usermod -aG cdrom,audio,render,video,plugdev,users,dialout,dip,input "$USER"
 
-# --- Install Docker Engine ---
-echo "Installing Docker Engine..."
+# --- Install Docker ---
+echo "Installing Docker..."
 apt-get remove -y docker docker-engine docker.io containerd runc || true
 apt-get install -y ca-certificates curl gnupg
 install -m 0755 -d /etc/apt/keyrings
-if ! curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg; then
-  echo "Error: Failed to download Docker GPG key."
-  exit 1
-fi
+curl -fsSL https://download.docker.com/linux/debian/gpg \
+  | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 chmod a+r /etc/apt/keyrings/docker.gpg
 echo \
   "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-  https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-  tee /etc/apt/sources.list.d/docker.list > /dev/null
+  https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+  > /etc/apt/sources.list.d/docker.list
 apt-get update
-if ! apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin; then
-  echo "Error: Docker installation failed."
-  exit 1
-fi
+apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 systemctl enable docker
 systemctl start docker
 usermod -aG docker "$USER"
 
-# --- Setup Home Assistant container ---
-echo "Setting up Home Assistant container..."
-docker_args=( 
+# --- Home Assistant Container ---
+echo "Setting up Home Assistant..."
+docker_args=(
   --name homeassistant
   --restart=unless-stopped
   --privileged
@@ -65,15 +60,11 @@ docker_args=(
   -v /run/dbus:/run/dbus:ro
   --network=host
 )
-
 if ! docker ps -a --format '{{.Names}}' | grep -q '^homeassistant$'; then
-  if ! docker run -d "${docker_args[@]}" ghcr.io/home-assistant/home-assistant:stable; then
-    echo "Error: Home Assistant container setup failed."
-    exit 1
-  fi
+  docker run -d "${docker_args[@]}" ghcr.io/home-assistant/home-assistant:stable
 fi
 
-# --- Create Kodi systemd service ---
+# --- Kodi systemd service ---
 echo "Creating Kodi systemd service..."
 tee /etc/systemd/system/kodi.service > /dev/null <<EOF
 [Unit]
@@ -96,5 +87,6 @@ EOF
 systemctl daemon-reload
 systemctl enable kodi
 
-echo "Setup complete. Rebooting now..."
+echo "✅ Setup complete. Rebooting in 5 seconds..."
+sleep 5
 reboot
