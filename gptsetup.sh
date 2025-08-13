@@ -11,31 +11,20 @@ fi
 
 echo "Starting setup for Raspberry Pi OS Lite 64-bit (headless)..."
 
-# Update system
-apt-get update && apt-get full-upgrade -y
-apt-get install -y sudo
+# Update and upgrade system
+apt-get update -y
+apt-get full-upgrade -y
+
+# Install prerequisites
+apt-get install -y sudo curl gnupg ca-certificates
 
 USER=${SUDO_USER:-$(whoami)}
 HA_CONFIG_DIR="/home/$USER/homeassistant"
-KODI_CONFIG_DIR="/home/$USER/kodi"
-MEDIA_DIR="/home/$USER/media"
+MEDIA_DIR="/home/$USER/Media"
 
-# --- Ensure Home Assistant config directory exists and is writable ---
-mkdir -p "$HA_CONFIG_DIR"
-chown -R "$USER:$USER" "$HA_CONFIG_DIR"
-
-# --- Ensure Kodi config directory exists and is writable ---
-mkdir -p "$KODI_CONFIG_DIR"
-chown -R "$USER:$USER" "$KODI_CONFIG_DIR"
-
-# --- Ensure media directory exists with subfolders ---
-mkdir -p "$MEDIA_DIR"
-chown -R "$USER:$USER" "$MEDIA_DIR"
-
-# --- Enable automatic time sync ---
-timedatectl set-ntp true
-systemctl enable systemd-timesyncd
-systemctl start systemd-timesyncd
+# Ensure HA config and media directories exist and are writable
+mkdir -p "$HA_CONFIG_DIR" "$MEDIA_DIR"
+chown -R "$USER:$USER" "$HA_CONFIG_DIR" "$MEDIA_DIR"
 
 # Get timezone
 TZ=$(timedatectl show -p Timezone --value || echo "UTC")
@@ -49,35 +38,23 @@ usermod -aG cdrom,audio,render,video,plugdev,users,dialout,dip,input "$USER"
 # --- Install Docker ---
 echo "Installing Docker..."
 apt-get remove -y docker docker-engine docker.io containerd runc || true
-apt-get install -y ca-certificates curl gnupg
+
 install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/debian/gpg \
-  | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 chmod a+r /etc/apt/keyrings/docker.gpg
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-  https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
-  > /etc/apt/sources.list.d/docker.list
+
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+> /etc/apt/sources.list.d/docker.list
+
 apt-get update
 apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 systemctl enable docker
-systemctl start docker
 usermod -aG docker "$USER"
 
 # --- Home Assistant Container ---
-echo "Setting up Home Assistant..."
-docker_args=(
-  --name homeassistant
-  --restart=unless-stopped
-  --privileged
-  -e TZ="$TZ"
-  -v "$HA_CONFIG_DIR":/config
-  -v /run/dbus:/run/dbus:ro
-  --network=host
-)
-if ! docker ps -a --format '{{.Names}}' | grep -q '^homeassistant$'; then
-  docker run -d --pull always "${docker_args[@]}" ghcr.io/home-assistant/home-assistant:stable
-fi
+echo "Home Assistant setup will occur after first reboot."
+echo "Docker is installed but not running yet."
 
 # --- Kodi systemd service ---
 echo "Creating Kodi systemd service..."
@@ -89,7 +66,7 @@ After=network.target
 [Service]
 User=$USER
 Group=$USER
-Environment="HOME=$KODI_CONFIG_DIR"
+Environment="HOME=/home/$USER"
 Type=simple
 ExecStart=/usr/bin/kodi --standalone
 Restart=unless-stopped
