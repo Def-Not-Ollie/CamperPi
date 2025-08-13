@@ -87,6 +87,6 @@ EOF
 systemctl daemon-reload
 systemctl enable kodi
 
-echo "✅ Setup complete. Rebooting in 5 seconds..."
+echo "Setup complete. Rebooting in 5 seconds..."
 sleep 5
 reboot
